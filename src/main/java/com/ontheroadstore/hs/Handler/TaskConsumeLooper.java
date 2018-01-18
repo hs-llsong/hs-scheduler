@@ -21,6 +21,7 @@ public class TaskConsumeLooper extends DbLooper {
     private final int sleepTime = 2000; //2 seconds
     private final int poolSize = 20;
     private ScheduledExecutorService executorService;
+
     public TaskConsumeLooper(App app) {
         super(app);
         executorService = Executors.newScheduledThreadPool(poolSize);
@@ -28,60 +29,67 @@ public class TaskConsumeLooper extends DbLooper {
     }
 
     int doBusiness() {
-        if (getFluentJdbc()==null) {
+        if (getFluentJdbc() == null) {
             buildFluentJdbc();
         }
         HsScheduleJob job = null;
         job = getApp().getLocalCacheHandler().poll();
         if (job == null) return sleepTime;
 
-            if (job.getStatus()== AppConstent.JOB_STATUS_TODO) {
-                return doExecutorServiceSchedule(job,job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
+        if (job.getStatus() == AppConstent.JOB_STATUS_TODO) {
+            return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
+        } else {
+
+            if (StringUtils.isNullOrEmpty(job.getUpdate_time())) {
+                logger.info("Update time is null.");
+                return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
             } else {
-
-                if (StringUtils.isNullOrEmpty(job.getUpdate_time())) {
-                    logger.info("Update time is null.");
-                    return doExecutorServiceSchedule(job,job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
-                }
-                DateTime nowDateTime = DateTime.now();
-                DateTimeFormatter format = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.S");
-                DateTime updateDateTime;
-                try {
-                    updateDateTime = DateTime.parse(job.getUpdate_time(), format);
-                }catch (Exception e) {
-                    logger.error(e.getMessage());
-                    return doExecutorServiceSchedule(job,job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
-                }
-                int escapedMinutes = Minutes.minutesBetween(updateDateTime,nowDateTime).getMinutes();
-                int totalMinutes = getTotalMinutes(job);
-                int remain = totalMinutes - escapedMinutes;
-                if(remain<0) remain = 0;
-                logger.info("Continue to do job(ID:" + job.getId() + ") with remain minutes:" + remain);
-                return doExecutorServiceSchedule(job,remain,TimeUnit.MINUTES);
-
+                return doAdjustExecuteTime(job.getUpdate_time(), job);
             }
+
+        }
     }
-    private int doExecutorServiceSchedule(HsScheduleJob job,int timing,TimeUnit timeUnit) {
+
+    private int doAdjustExecuteTime(String beginTime, HsScheduleJob job) {
+        DateTime nowDateTime = DateTime.now();
+        DateTimeFormatter format = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.S");
+        DateTime updateDateTime;
         try {
-            executorService.schedule(new WorkerThread(job, this),timing, timeUnit);
+            updateDateTime = DateTime.parse(beginTime, format);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
+        }
+        int escapedMinutes = Minutes.minutesBetween(updateDateTime, nowDateTime).getMinutes();
+        int totalMinutes = getTotalMinutes(job);
+        int remain = totalMinutes - escapedMinutes;
+        if (remain < 0) remain = 0;
+        logger.info("Continue to do job(ID:" + job.getId() + ") with remain minutes:" + remain);
+        return doExecutorServiceSchedule(job, remain, TimeUnit.MINUTES);
+    }
+
+    private int doExecutorServiceSchedule(HsScheduleJob job, int timing, TimeUnit timeUnit) {
+        try {
+            executorService.schedule(new WorkerThread(job, this), timing, timeUnit);
             logger.info("Job(ID:" + job.getId() + ") in working schedule.");
             return 0;
         } catch (RejectedExecutionException e) {
-            logger.error("Rejected job(ID:"+ job.getId() + ") back to queue," + e.getMessage());
+            logger.error("Rejected job(ID:" + job.getId() + ") back to queue," + e.getMessage());
             getApp().getLocalCacheHandler().add(job);
             return sleepTime;
         }
     }
+
     private TimeUnit getTimeUint(int timingUint) {
-        if(timingUint==0) return TimeUnit.MINUTES;
-        if(timingUint==1) return TimeUnit.HOURS;
-        if(timingUint==2) return TimeUnit.DAYS;
+        if (timingUint == 0) return TimeUnit.MINUTES;
+        if (timingUint == 1) return TimeUnit.HOURS;
+        if (timingUint == 2) return TimeUnit.DAYS;
         return TimeUnit.MINUTES;
     }
 
     private int getTotalMinutes(HsScheduleJob job) {
-        if(job.getTiming_unit()==1) return job.getTiming_cycle()*60;
-        if(job.getTiming_unit()==2) return job.getTiming_cycle()*24*60;
+        if (job.getTiming_unit() == 1) return job.getTiming_cycle() * 60;
+        if (job.getTiming_unit() == 2) return job.getTiming_cycle() * 24 * 60;
         return job.getTiming_cycle();
     }
 }

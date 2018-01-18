@@ -54,8 +54,13 @@ public class WorkerThread implements Runnable {
         }
         logger.info("Job(ID:" + job.getId() + ") done.");
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
+        doAttachmentJob(job);
     }
 
+    private boolean doAttachmentJob(HsScheduleJob job) {
+        //TODO
+        return true;
+    }
     private UpdateResult updateJobStatus(int jobId,int status) {
         String updateStatusSql = "UPDATE sp_hs_schedule_jobs SET status = "
                 + status
