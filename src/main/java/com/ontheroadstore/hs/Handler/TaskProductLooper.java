@@ -22,7 +22,7 @@ import java.util.List;
 public class TaskProductLooper extends DbLooper {
 
     private final Logger logger = Logger.getLogger(TaskProductLooper.class);
-    private final int sleepTime = 60000; //60 seconds
+    private final int sleepTime = 30000; //30 seconds
     private final int pageSize = 1000;
     public TaskProductLooper(App app) {
         super(app);

@@ -38,6 +38,14 @@ public class TaskConsumeLooper extends DbLooper {
 
         if (job.getStatus() == AppConstent.JOB_STATUS_TODO) {
             return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
+        } else if(job.getStatus() == AppConstent.JOB_STATUS_REJECTED) {
+            //TODO rejected job
+            logger.info("To do rejected job(ID:" + job.getId() + ")");
+            if (StringUtils.isNullOrEmpty(job.getCreate_time())) {
+                return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
+            } else {
+                return doAdjustExecuteTime(job.getCreate_time(), job);
+            }
         } else {
 
             if (StringUtils.isNullOrEmpty(job.getUpdate_time())) {
@@ -75,6 +83,7 @@ public class TaskConsumeLooper extends DbLooper {
             return 0;
         } catch (RejectedExecutionException e) {
             logger.error("Rejected job(ID:" + job.getId() + ") back to queue," + e.getMessage());
+            job.setStatus(AppConstent.JOB_STATUS_REJECTED);
             getApp().getLocalCacheHandler().add(job);
             return sleepTime;
         }
