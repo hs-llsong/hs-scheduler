@@ -20,6 +20,16 @@ public class HsScheduleJob implements Serializable {
     private String create_time;
     private int status;
     private String attachment_script;
+    private String original_sql;
+    private String update_time;
+
+    public String getUpdate_time() {
+        return update_time;
+    }
+
+    public void setUpdate_time(String update_time) {
+        this.update_time = update_time;
+    }
 
     public int getId() {
         return id;
@@ -131,5 +141,13 @@ public class HsScheduleJob implements Serializable {
 
     public void setAttachment_script(String attachment_script) {
         this.attachment_script = attachment_script;
+    }
+
+    public String getOriginal_sql() {
+        return original_sql;
+    }
+
+    public void setOriginal_sql(String original_sql) {
+        this.original_sql = original_sql;
     }
 }

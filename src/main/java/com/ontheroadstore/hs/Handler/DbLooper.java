@@ -5,8 +5,6 @@ import org.apache.log4j.Logger;
 import org.codejargon.fluentjdbc.api.FluentJdbc;
 import org.codejargon.fluentjdbc.api.FluentJdbcBuilder;
 import org.codejargon.fluentjdbc.api.FluentJdbcException;
-import org.codejargon.fluentjdbc.api.query.listen.AfterQueryListener;
-import org.codejargon.fluentjdbc.api.query.listen.ExecutionDetails;
 
 import javax.sql.DataSource;
 

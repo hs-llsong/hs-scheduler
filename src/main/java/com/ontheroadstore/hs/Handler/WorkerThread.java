@@ -7,6 +7,8 @@ import org.apache.log4j.Logger;
 import org.codejargon.fluentjdbc.api.FluentJdbcException;
 import org.codejargon.fluentjdbc.api.query.Query;
 import org.codejargon.fluentjdbc.api.query.UpdateResult;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -57,9 +59,12 @@ public class WorkerThread implements Runnable {
     private UpdateResult updateJobStatus(int jobId,int status) {
         String updateStatusSql = "UPDATE sp_hs_schedule_jobs SET status = "
                 + status
-                + " WHERE id = " + jobId ;
+                + ",update_time=? WHERE id = " + jobId ;
+        DateTime dateTime = DateTime.now();
+        String dateSTime = dateTime.toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss"));
+
         try {
-            return this.looper.getFluentJdbc().query().update(updateStatusSql).run();
+            return this.looper.getFluentJdbc().query().update(updateStatusSql).params(dateSTime).run();
         } catch (FluentJdbcException e) {
             logger.error(e.getMessage() + ",cause:" + e.getCause());
             return null;
@@ -67,25 +72,69 @@ public class WorkerThread implements Runnable {
 
     }
     private boolean checkJobParams(HsScheduleJob job) {
-        if (StringUtils.isNullOrEmpty(job.getBiz_table_name())) {
-            logger.error("Bad job(ID:" + job.getId() + ") BizTableName is empty! ");
-            return false;
+
+        if(job.getType()==AppConstent.JOB_TYPE_NORMAL) {
+            if (StringUtils.isNullOrEmpty(job.getBiz_table_name())) {
+                logger.error("Bad job(ID:" + job.getId() + ") BizTableName is empty! ");
+                return false;
+            }
+            if (StringUtils.isNullOrEmpty(job.getCondition_field_name())) {
+                logger.error("Bad job(ID:" + job.getId() + ") Condition field name is empty! ");
+                return false;
+            }
+            if (job.getCondition_field_type()==0 && StringUtils.isNullOrEmpty(job.getCondition_field_value())) {
+                logger.error("Bad job(ID:" + job.getId() + ") Condition field value is empty! ");
+                return false;
+            }
+            if (StringUtils.isNullOrEmpty(job.getBe_updated_field_name())) {
+                logger.error("Bad job(ID:" + job.getId() + ") Be update field name is empty! ");
+                return false;
+            }
         }
-        if (StringUtils.isNullOrEmpty(job.getCondition_field_name())) {
-            logger.error("Bad job(ID:" + job.getId() + ") Condition field name is empty! ");
-            return false;
+
+        if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SQL) {
+            if(StringUtils.isNullOrEmpty(job.getOriginal_sql())) {
+                logger.error("Bad job(ID:" + job.getId() + ") Original sql is empty! ");
+                return false;
+            }
         }
-        if (job.getCondition_field_type()==0 && StringUtils.isNullOrEmpty(job.getCondition_field_value())) {
-            logger.error("Bad job(ID:" + job.getId() + ") Condition field value is empty! ");
-            return false;
+
+        if(job.getType() == AppConstent.JOB_TYPE_EXECUTE_SCRIPT) {
+            if(StringUtils.isNullOrEmpty(job.getAttachment_script())) {
+                logger.error("Bad job(ID:" + job.getId() + ") Attachment script is empty! ");
+                return false;
+            }
         }
-        if (StringUtils.isNullOrEmpty(job.getBe_updated_field_name())) {
-            logger.error("Bad job(ID:" + job.getId() + ") Be update field name is empty! ");
+
+        return true;
+    }
+    private boolean doJob(HsScheduleJob job) {
+        if(job.getType()==AppConstent.JOB_TYPE_NORMAL) return doNormallyJob(job);
+        if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SCRIPT) return doScriptJob(job);
+        if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SQL) return doSqlJob(job);
+        return false;
+    }
+    private boolean doScriptJob(HsScheduleJob job) {
+        logger.info("Do script job(ID:" + job.getId() + ")");
+        return true;
+    }
+
+    private boolean doSqlJob(HsScheduleJob job) {
+        Query query = looper.getFluentJdbc().query();
+        try {
+            UpdateResult rs = query.update(job.getOriginal_sql())
+                    .run();
+            if(rs.affectedRows()<=0) {
+                logger.error("No affect result job(ID:" + job.getId() + ")");
+            }
+        } catch (FluentJdbcException e) {
+            logger.error(e.getMessage() + ",cause:" + e.getCause());
             return false;
         }
         return true;
     }
-    private boolean doJob(HsScheduleJob job) {
+
+    private boolean doNormallyJob(HsScheduleJob job) {
         String updateSql = "UPDATE " + job.getBiz_table_name()
                 + " SET "
                 + job.getBe_updated_field_name()

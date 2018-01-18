@@ -9,6 +9,8 @@ import org.codejargon.fluentjdbc.api.mapper.Mappers;
 import org.codejargon.fluentjdbc.api.query.Mapper;
 import org.codejargon.fluentjdbc.api.query.Query;
 import org.codejargon.fluentjdbc.api.query.UpdateResult;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -24,19 +26,20 @@ public class TaskProductLooper extends DbLooper {
     private final int pageSize = 1000;
     public TaskProductLooper(App app) {
         super(app);
+        loadRunningJob();
     }
 
     int doBusiness() {
         if (getFluentJdbc()==null) {
             buildFluentJdbc();
         }
-        int count = this.getTaskCounts();
+        int count = this.getTaskCounts(0);
         if (count <= 0) {
             return sleepTime;
         }
         int totalPages = (int)Math.floor(count/pageSize) + 1;
         for (int page=1;page<=totalPages;page++) {
-            List<HsScheduleJob> jobs = getOnePageJobs(page,pageSize);
+            List<HsScheduleJob> jobs = getOnePageJobs(0,page,pageSize);
             if (jobs == null) continue;
             if (jobs.isEmpty()) continue;
             if(getApp().getLocalCacheHandler().addAll(jobs)){
@@ -45,6 +48,22 @@ public class TaskProductLooper extends DbLooper {
         }
         logger.info("Done total pages:" + totalPages);
         return 1000;
+    }
+    private void loadRunningJob() {
+        if (getFluentJdbc()==null) {
+            buildFluentJdbc();
+        }
+
+        int count = this.getTaskCounts(1);
+        logger.info("To loading running jobs,total:" + count);
+        int totalPages = (int)Math.floor(count/pageSize) + 1;
+        for (int page=1;page<=totalPages;page++) {
+            List<HsScheduleJob> jobs = getOnePageJobs(1,page,pageSize);
+            if (jobs == null) continue;
+            if (jobs.isEmpty()) continue;
+            getApp().getLocalCacheHandler().addAll(jobs);
+        }
+        logger.info("Done total pages:" + totalPages);
     }
     private boolean updateJobsStatus(List<HsScheduleJob> jobs) {
         Query query = getFluentJdbc().query();
@@ -55,14 +74,17 @@ public class TaskProductLooper extends DbLooper {
             sbIds.append(job.getId()).append(',');
         }
         sbIds.deleteCharAt(sbIds.length()-1);
+
+        DateTime dateTime = DateTime.now();
+        String dateSTime = dateTime.toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss"));
         String updateSql = "UPDATE sp_hs_schedule_jobs SET status = "
                 + AppConstent.JOB_STATUS_DOING
-                + " WHERE status = 0 AND id in (" + sbIds + ")";
+                + ",update_time=? WHERE status = 0 AND id in (" + sbIds + ")";
         try {
             UpdateResult result = query.update(updateSql)
+                    .params(dateSTime)
                     .run();
             if (result.affectedRows()>0) {
-                sbIds = null;
                 return true;
             } else {
                 logger.error("update status failed." + sbIds.toString());
@@ -70,15 +92,14 @@ public class TaskProductLooper extends DbLooper {
         } catch (FluentJdbcException e) {
             logger.error(e.getMessage() + ",cause:" + e.getCause());
         }
-        sbIds = null;
         return false;
     }
-    private int getTaskCounts() {
+    private int getTaskCounts(int status) {
         if (getFluentJdbc() == null) {
             return 0;
         }
         Query query = getFluentJdbc().query();
-        String countSql = "SELECT count(*) FROM sp_hs_schedule_jobs WHERE status = 0";
+        String countSql = "SELECT count(*) FROM sp_hs_schedule_jobs WHERE status = " + status;
         int count = 0;
         try {
             count = query.select(countSql)
@@ -90,7 +111,7 @@ public class TaskProductLooper extends DbLooper {
         return count;
     }
 
-    private List<HsScheduleJob> getOnePageJobs(int page,int pageSize) {
+    private List<HsScheduleJob> getOnePageJobs(int status,int page,int pageSize) {
         if (getFluentJdbc() == null) {
             return null;
         }
@@ -100,7 +121,7 @@ public class TaskProductLooper extends DbLooper {
         }
         int start = (page - 1) * pageSize;
         int end = pageSize;
-        String querySql = "SELECT * FROM sp_hs_schedule_jobs WHERE status = 0 limit " + start + "," + end;
+        String querySql = "SELECT * FROM sp_hs_schedule_jobs WHERE status = " + status + " limit " + start + "," + end;
         List<HsScheduleJob> result = null;
         try {
             result = query.select(querySql)
@@ -121,7 +142,8 @@ public class TaskProductLooper extends DbLooper {
                             hsScheduleJob.setTiming_unit(rs.getInt("timing_unit"));
                             hsScheduleJob.setField_final_value(rs.getInt("field_final_value"));
                             hsScheduleJob.setField_original_value(rs.getInt("field_original_value"));
-
+                            hsScheduleJob.setOriginal_sql(rs.getString("original_sql"));
+                            hsScheduleJob.setUpdate_time(rs.getString("update_time"));
                             return hsScheduleJob;
                         }
                     });
