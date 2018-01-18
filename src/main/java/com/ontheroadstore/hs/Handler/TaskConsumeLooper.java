@@ -22,12 +22,15 @@ public class TaskConsumeLooper extends DbLooper {
     }
 
     int doBusiness() {
+        if (getFluentJdbc()==null) {
+            buildFluentJdbc();
+        }
         HsScheduleJob job = null;
         job = getApp().getLocalCacheHandler().poll();
         if (job == null) return sleepTime;
         try {
             executorService.schedule(new WorkerThread(job,this),job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
-            logger.info("Job(ID:" + job.getId() + ") in working.");
+            logger.info("Job(ID:" + job.getId() + ") in working schedule.");
             return 0;
         } catch (RejectedExecutionException e) {
             logger.error("Rejected job(ID:"+ job.getId() + ") back to queue," + e.getMessage());

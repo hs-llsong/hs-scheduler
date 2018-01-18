@@ -7,4 +7,6 @@ public class AppConstent {
     public static int JOB_STATUS_DOING = 1;
     public static int JOB_STATUS_DONE = 2;
     public static int JOB_STATUS_TODO = 0;
+    public static int JOB_STATUS_GIVEUP = 31;
+    public static int JOB_STATUS_DONE_RESULT_FAILED = 12;
 }

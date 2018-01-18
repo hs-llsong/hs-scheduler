@@ -68,7 +68,7 @@ public class TaskProductLooper extends DbLooper {
                 logger.error("update status failed." + sbIds.toString());
             }
         } catch (FluentJdbcException e) {
-            logger.error(e.getMessage() + ",input params:" + sbIds);
+            logger.error(e.getMessage() + ",cause:" + e.getCause());
         }
         sbIds = null;
         return false;
@@ -85,7 +85,7 @@ public class TaskProductLooper extends DbLooper {
                     .singleResult(Mappers.singleInteger());
 
         } catch (FluentJdbcSqlException e) {
-            logger.error( e.getMessage());
+            logger.error( e.getMessage() + ",cause:" + e.getCause());
         }
         return count;
     }
@@ -126,7 +126,7 @@ public class TaskProductLooper extends DbLooper {
                         }
                     });
         } catch (FluentJdbcException e) {
-            logger.error(e.getMessage());
+            logger.error(e.getMessage() + ",cause:" + e.getCause());
         } catch (Exception e) {
             logger.error(e.getMessage());
         }
