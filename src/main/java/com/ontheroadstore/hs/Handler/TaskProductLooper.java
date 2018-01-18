@@ -55,7 +55,7 @@ public class TaskProductLooper extends DbLooper {
         }
 
         int count = this.getTaskCounts(1);
-        logger.info("To loading running jobs,total:" + count);
+        logger.info("Loading running jobs,total:" + count);
         int totalPages = (int)Math.floor(count/pageSize) + 1;
         for (int page=1;page<=totalPages;page++) {
             List<HsScheduleJob> jobs = getOnePageJobs(1,page,pageSize);
@@ -63,7 +63,6 @@ public class TaskProductLooper extends DbLooper {
             if (jobs.isEmpty()) continue;
             getApp().getLocalCacheHandler().addAll(jobs);
         }
-        logger.info("Done total pages:" + totalPages);
     }
     private boolean updateJobsStatus(List<HsScheduleJob> jobs) {
         Query query = getFluentJdbc().query();
