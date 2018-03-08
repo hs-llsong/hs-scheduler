@@ -69,6 +69,7 @@ public class WorkerThread implements Runnable {
             logger.error(e.getMessage()+ e.getCause());
             return false;
         }
+        if (attachJob == null) return false;
         switch (attachJob.getType()) {
             case AppConstent.ATTACH_JOB_TYPE_NEWTASK:
                 return doNewTask(attachJob.getJob());
