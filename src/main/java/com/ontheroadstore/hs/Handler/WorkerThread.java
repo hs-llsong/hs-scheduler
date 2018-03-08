@@ -1,7 +1,9 @@
 package com.ontheroadstore.hs.Handler;
 
+import com.google.gson.Gson;
 import com.mysql.jdbc.StringUtils;
 import com.ontheroadstore.hs.AppConstent;
+import com.ontheroadstore.hs.bean.AttachJob;
 import com.ontheroadstore.hs.bean.HsScheduleJob;
 import org.apache.log4j.Logger;
 import org.codejargon.fluentjdbc.api.FluentJdbcException;
@@ -54,12 +56,39 @@ public class WorkerThread implements Runnable {
         }
         logger.info("Job(ID:" + job.getId() + ") done.");
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
-        doAttachmentJob(job);
+
     }
 
     private boolean doAttachmentJob(HsScheduleJob job) {
-        //TODO
+        if (StringUtils.isNullOrEmpty(job.getAttachment_script())) return false;
+
+        AttachJob attachJob = null;
+        try {
+            attachJob = new Gson().fromJson(job.getAttachment_script(), AttachJob.class);
+        }catch (Exception e) {
+            logger.error(e.getMessage()+ e.getCause());
+            return false;
+        }
+        switch (attachJob.getType()) {
+            case AppConstent.ATTACH_JOB_TYPE_NEWTASK:
+                return doNewTask(attachJob.getJob());
+            case AppConstent.ATTACH_JOB_TYPE_PUSH_MESSAGE:
+                break;
+            default:
+                break;
+        }
         return true;
+    }
+    private boolean doNewTask(Object job) {
+        try {
+            HsScheduleJob newJob = (HsScheduleJob) job;
+            if(newJob == null)return false;
+            getLooper().getApp().getLocalCacheHandler().add(newJob);
+            return true;
+        }catch (Exception e) {
+            logger.error(e.getMessage());
+            return false;
+        }
     }
     private UpdateResult updateJobStatus(int jobId,int status) {
         String updateStatusSql = "UPDATE sp_hs_schedule_jobs SET status = "
@@ -166,7 +195,11 @@ public class WorkerThread implements Runnable {
             logger.error(e.getMessage() + ",cause:" + e.getCause());
             return false;
         }
+        doAttachmentJob(job);
         return true;
     }
 
+    public DbLooper getLooper() {
+        return looper;
+    }
 }
