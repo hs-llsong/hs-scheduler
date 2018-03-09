@@ -3,6 +3,7 @@ package com.ontheroadstore.hs.Handler;
 import com.mysql.jdbc.StringUtils;
 import com.ontheroadstore.hs.App;
 import com.ontheroadstore.hs.AppConstent;
+import com.ontheroadstore.hs.AppPropertiesKey;
 import com.ontheroadstore.hs.bean.HsScheduleJob;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
@@ -19,11 +20,16 @@ public class TaskConsumeLooper extends DbLooper {
 
     private final Logger logger = Logger.getLogger(TaskConsumeLooper.class);
     private final int sleepTime = 2000; //2 seconds
-    private final int poolSize = 20;
+    private final int defualtPoolSize = 20;
     private ScheduledExecutorService executorService;
 
     public TaskConsumeLooper(App app) {
         super(app);
+        String sPoolSize = app.getProp().getProperty(AppPropertiesKey.THREAD_POOL_SIZE_KEY);
+        int poolSize = defualtPoolSize;
+        if(!StringUtils.isNullOrEmpty(sPoolSize)) {
+            poolSize = Integer.valueOf(sPoolSize);
+        }
         executorService = Executors.newScheduledThreadPool(poolSize);
         logger.info("ExecutorService started with pool size:" + poolSize);
     }

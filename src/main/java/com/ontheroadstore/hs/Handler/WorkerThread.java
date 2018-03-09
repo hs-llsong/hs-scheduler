@@ -37,7 +37,7 @@ public class WorkerThread implements Runnable {
             logger.error("Jdbc connection is null.can't finish job(ID:" + job.getId()+ ")");
             try {
                 Thread.sleep(1000);
-            }catch (InterruptedException e) {
+            } catch (InterruptedException e) {
 
             }
             job.setTiming_cycle(0);
@@ -207,8 +207,9 @@ public class WorkerThread implements Runnable {
         String updateSql = "UPDATE " + job.getBiz_table_name()
                 + " SET "
                 + job.getBe_updated_field_name()
-                + " = :update_value "
-                + "WHERE "
+                + " = :update_value"
+                + ",updated_at = :update_at"
+                + " WHERE "
                 + job.getCondition_field_name()
                 + " = :condition_value "
                 + "AND "
@@ -218,6 +219,7 @@ public class WorkerThread implements Runnable {
         namedParams.put("condition_value",job.getCondition_field_value());
         namedParams.put("old_value",job.getField_original_value());
         namedParams.put("update_value",job.getField_final_value());
+        namedParams.put("updated_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
         Query query = looper.getFluentJdbc().query();
         try {
             UpdateResult rs = query.update(updateSql)
