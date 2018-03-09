@@ -52,7 +52,7 @@ public class WorkerThread implements Runnable {
 
         boolean result = doJob(job);
         if (!result) {
-            logger.error("do job failed.");
+            logger.error("Job(ID:" + job.getId() + ") Failed.");
             updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE_RESULT_FAILED);
             return;
         }
@@ -95,6 +95,9 @@ public class WorkerThread implements Runnable {
         }
     }
     private UpdateResult updateJobStatus(int jobId,int status) {
+        if (jobId == 0) {
+            return null;
+        }
         String updateStatusSql = "UPDATE sp_hs_schedule_jobs SET status = "
                 + status
                 + ",update_time=? WHERE id = " + jobId ;
@@ -133,7 +136,7 @@ public class WorkerThread implements Runnable {
                     .update(logSql)
                     .params(params)
                     .run();
-
+            if (result.affectedRows()<=0) return false;
         } catch (FluentJdbcException e) {
             logger.error(e.getMessage() + ",cause:" + e.getCause() + " params:" + new Gson().toJson(params));
             return false;
@@ -227,6 +230,7 @@ public class WorkerThread implements Runnable {
                     .run();
             if(rs.affectedRows()<=0) {
                 logger.error("No affect result job(ID:" + job.getId() + ")");
+                return false;
             }
         } catch (FluentJdbcException e) {
             logger.error(e.getMessage() + ",cause:" + e.getCause());
