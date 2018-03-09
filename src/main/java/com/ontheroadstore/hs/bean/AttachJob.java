@@ -8,7 +8,7 @@ import java.io.Serializable;
 public class AttachJob implements Serializable{
     private int type;
     private String desc;
-    private Object job;
+    private HsScheduleJob job;
 
     public int getType() {
         return type;
@@ -26,11 +26,11 @@ public class AttachJob implements Serializable{
         this.desc = desc;
     }
 
-    public Object getJob() {
+    public HsScheduleJob getJob() {
         return job;
     }
 
-    public void setJob(Object job) {
+    public void setJob(HsScheduleJob job) {
         this.job = job;
     }
 }

@@ -12,7 +12,9 @@ import org.codejargon.fluentjdbc.api.query.UpdateResult;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,12 +58,15 @@ public class WorkerThread implements Runnable {
         }
         logger.info("Job(ID:" + job.getId() + ") done.");
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
-
+        result = refundOperateLog(job);
+        if (!result) {
+            logger.error("Record refund log error!");
+        }
     }
 
     private boolean doAttachmentJob(HsScheduleJob job) {
         if (StringUtils.isNullOrEmpty(job.getAttachment_script())) return false;
-
+        logger.debug("New job start:" + job.getAttachment_script());
         AttachJob attachJob = null;
         try {
             attachJob = new Gson().fromJson(job.getAttachment_script(), AttachJob.class);
@@ -80,11 +85,9 @@ public class WorkerThread implements Runnable {
         }
         return true;
     }
-    private boolean doNewTask(Object job) {
+    private boolean doNewTask(HsScheduleJob job) {
         try {
-            HsScheduleJob newJob = (HsScheduleJob) job;
-            if(newJob == null)return false;
-            getLooper().getApp().getLocalCacheHandler().add(newJob);
+            getLooper().getApp().getLocalCacheHandler().add(job);
             return true;
         }catch (Exception e) {
             logger.error(e.getMessage());
@@ -105,6 +108,37 @@ public class WorkerThread implements Runnable {
             return null;
         }
 
+    }
+    private boolean refundOperateLog(HsScheduleJob job) {
+        if (!job.getBiz_table_name().equals("sp_hs_new_refund")) {
+            return false;
+        }
+        List<Object> params = new ArrayList();
+        //reufnd_id,evidence_id,operator,operate_uid,old_status,final_status,created_at,updated_at;
+        //refund_id,0,4,0,
+        params.add(job.getCondition_field_value());
+        params.add(0);
+        params.add(4);
+        params.add(0);
+        params.add(job.getField_original_value());
+        params.add(job.getField_final_value());
+        DateTime dateTime = DateTime.now();
+        String dateSTime = dateTime.toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss"));
+        params.add(dateSTime);
+        params.add(dateSTime);
+        String logSql = "INSERT INTO sp_hs_refund_operate_log(refund_id,evidence_id,operator,operate_uid,old_status,final_status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)";
+        try {
+            UpdateResult result = this.looper.getFluentJdbc()
+                    .query()
+                    .update(logSql)
+                    .params(params)
+                    .run();
+
+        } catch (FluentJdbcException e) {
+            logger.error(e.getMessage() + ",cause:" + e.getCause() + " params:" + new Gson().toJson(params));
+            return false;
+        }
+        return true;
     }
     private boolean checkJobParams(HsScheduleJob job) {
 
