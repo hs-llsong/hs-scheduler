@@ -7,8 +7,10 @@ import com.ontheroadstore.hs.bean.AttachJob;
 import com.ontheroadstore.hs.bean.HsScheduleJob;
 import org.apache.log4j.Logger;
 import org.codejargon.fluentjdbc.api.FluentJdbcException;
+import org.codejargon.fluentjdbc.api.mapper.Mappers;
 import org.codejargon.fluentjdbc.api.query.Query;
 import org.codejargon.fluentjdbc.api.query.UpdateResult;
+import org.codejargon.fluentjdbc.api.query.UpdateResultGenKeys;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 
@@ -58,10 +60,17 @@ public class WorkerThread implements Runnable {
         }
         logger.info("Job(ID:" + job.getId() + ") done.");
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
-        result = refundOperateLog(job);
-        if (!result) {
-            logger.error("Record refund log error!");
+        if (job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)){
+            int evidenceId = 0;
+            if(job.getType() == AppConstent.JOB_TYPE_NORMAL) {
+                evidenceId = (int)insertRefundEvidence(job);
+            }
+            result = refundOperateLog(job,evidenceId);
+            if (!result) {
+                logger.error("Record refund log error!");
+            }
         }
+
     }
 
     private boolean doAttachmentJob(HsScheduleJob job) {
@@ -112,7 +121,38 @@ public class WorkerThread implements Runnable {
         }
 
     }
-    private boolean refundOperateLog(HsScheduleJob job) {
+    private long insertRefundEvidence(HsScheduleJob job) {
+        if (!job.getBiz_table_name().equals("sp_hs_new_refund")) {
+            return 0L;
+        }
+        if(StringUtils.isNullOrEmpty(job.getOriginal_sql())) return 0L;
+        List<Object> params = new ArrayList();
+        //reufnd_id,operator,operate_uid,reason,attachment,created_at,updated_at;
+        //refund_id,4,0,
+        params.add(job.getCondition_field_value());
+        params.add(4);
+        params.add(0);
+        params.add("系统自动同意");
+        params.add(job.getOriginal_sql());
+        DateTime dateTime = DateTime.now();
+        String dateSTime = dateTime.toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss"));
+        params.add(dateSTime);
+        params.add(dateSTime);
+        String insertSql = "INSERT INTO sp_hs_refund_evidence(refund_id,operator,operator_uid,reason,attachment,created_at,updated_at) VALUES(?,?,?,?,?,?,?)";
+        try {
+            UpdateResultGenKeys<Long> result = this.looper.getFluentJdbc()
+                    .query()
+                    .update(insertSql)
+                    .params(params)
+                    .runFetchGenKeys(Mappers.singleLong());
+            return result.generatedKeys().get(0);
+        } catch (FluentJdbcException e) {
+            logger.error(e.getMessage() + ",cause:" + e.getCause() + " params:" + new Gson().toJson(params));
+            return 0L;
+        }
+
+    }
+    private boolean refundOperateLog(HsScheduleJob job,int evidenceId) {
         if (!job.getBiz_table_name().equals("sp_hs_new_refund")) {
             return false;
         }
@@ -120,7 +160,7 @@ public class WorkerThread implements Runnable {
         //reufnd_id,evidence_id,operator,operate_uid,old_status,final_status,created_at,updated_at;
         //refund_id,0,4,0,
         params.add(job.getCondition_field_value());
-        params.add(0);
+        params.add(evidenceId);
         params.add(4);
         params.add(0);
         params.add(job.getField_original_value());
@@ -207,6 +247,15 @@ public class WorkerThread implements Runnable {
     }
 
     private boolean doNormallyJob(HsScheduleJob job) {
+
+        if (job.getBiz_table_name().equals(AppConstent.ORDER_TABLE_NAME) ) {
+            return doOrderJob(job);
+        } else if(job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)) {
+            return doRefundJob(job);
+        }
+        return true;
+    }
+    private boolean doRefundJob(HsScheduleJob job) {
         String updateSql = "UPDATE " + job.getBiz_table_name()
                 + " SET "
                 + job.getBe_updated_field_name()
@@ -223,11 +272,58 @@ public class WorkerThread implements Runnable {
         namedParams.put("old_value",job.getField_original_value());
         namedParams.put("update_value",job.getField_final_value());
         namedParams.put("updated_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
+        if(!doUpdateSql(updateSql,namedParams)) return false;
+        doAttachmentJob(job);
+        return true;
+    }
+
+    private boolean doOrderJob(HsScheduleJob job) {
+        boolean isUnpaid = false;
+
+        if(job.getField_original_value()==0) {
+            isUnpaid = true;
+        }
+
+        String conditionFieldName = job.getCondition_field_name();
+        if(job.getCondition_field_value().startsWith("VR")) {
+            conditionFieldName = "union_order_number";
+        }
+
+        String updateTimeFieldName = isUnpaid?"complete_time":"deliver_time";
+        String updateSql = "UPDATE " + job.getBiz_table_name()
+                + " SET "
+                + job.getBe_updated_field_name()
+                + " = :update_value"
+                + "," + updateTimeFieldName
+                + " = :time_at"
+                + " WHERE "
+                + conditionFieldName
+                + " = :condition_value "
+                + "AND "
+                + job.getBe_updated_field_name()
+                + " = :old_value";
+                if (isUnpaid) {
+                    updateSql += " AND order_status=0";
+                }
+        Map<String,Object> namedParams = new HashMap<>();
+        namedParams.put("condition_value",job.getCondition_field_value());
+        namedParams.put("old_value",job.getField_original_value());
+        namedParams.put("update_value",isUnpaid?AppConstent.ORDER_PROCESS_STATUS_CLOSED:job.getField_final_value());
+        namedParams.put("time_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
+        logger.debug("SQL params:" + new Gson().toJson(namedParams));
+        if(!doUpdateSql(updateSql,namedParams)) return false;
+        doAttachmentJob(job);
+        return true;
+    }
+
+
+    private boolean doUpdateSql(String updateSql,Map<String,Object> namedParams) {
         Query query = looper.getFluentJdbc().query();
         try {
             UpdateResult rs = query.update(updateSql)
                     .namedParams(namedParams)
                     .run();
+
             if(rs.affectedRows()<=0) {
                 logger.error("No affect result job(ID:" + job.getId() + ")");
                 return false;
@@ -236,7 +332,6 @@ public class WorkerThread implements Runnable {
             logger.error(e.getMessage() + ",cause:" + e.getCause());
             return false;
         }
-        doAttachmentJob(job);
         return true;
     }
 

@@ -17,4 +17,8 @@ public class AppConstent {
 
     public static final int ATTACH_JOB_TYPE_NEWTASK = 1;
     public static final int ATTACH_JOB_TYPE_PUSH_MESSAGE = 2;
+
+    public static final String ORDER_TABLE_NAME = "sp_hs_orders";
+    public static final String REFUND_TABLE_NAME = "sp_hs_new_refund";
+    public static final int ORDER_PROCESS_STATUS_CLOSED = 33;
 }
