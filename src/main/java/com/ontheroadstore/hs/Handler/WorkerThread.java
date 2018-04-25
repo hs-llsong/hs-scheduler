@@ -2,18 +2,23 @@ package com.ontheroadstore.hs.Handler;
 
 import com.google.gson.Gson;
 import com.mysql.jdbc.StringUtils;
+import com.ontheroadstore.hs.App;
 import com.ontheroadstore.hs.AppConstent;
 import com.ontheroadstore.hs.bean.AttachJob;
 import com.ontheroadstore.hs.bean.HsScheduleJob;
 import org.apache.log4j.Logger;
 import org.codejargon.fluentjdbc.api.FluentJdbcException;
 import org.codejargon.fluentjdbc.api.mapper.Mappers;
+import org.codejargon.fluentjdbc.api.query.Mapper;
 import org.codejargon.fluentjdbc.api.query.Query;
 import org.codejargon.fluentjdbc.api.query.UpdateResult;
 import org.codejargon.fluentjdbc.api.query.UpdateResultGenKeys;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
+import redis.clients.jedis.Jedis;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,12 +29,18 @@ import java.util.Map;
  */
 public class WorkerThread implements Runnable {
 
+    private App app;
     private HsScheduleJob job;
     private DbLooper looper;
     private final Logger logger = Logger.getLogger(WorkerThread.class);
     public WorkerThread(HsScheduleJob job, DbLooper looper) {
         this.job = job;
         this.looper = looper;
+    }
+
+    public WorkerThread(HsScheduleJob job, DbLooper looper,App app) {
+        this(job,looper);
+        this.app = app;
     }
 
     @Override
@@ -60,6 +71,9 @@ public class WorkerThread implements Runnable {
         }
         logger.info("Job(ID:" + job.getId() + ") done.");
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
+        if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SCRIPT) {
+            return;
+        }
         if (job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)){
             int evidenceId = 0;
             if(job.getType() == AppConstent.JOB_TYPE_NORMAL) {
@@ -70,6 +84,10 @@ public class WorkerThread implements Runnable {
                 logger.error("Record refund log error!");
             }
         }
+
+        //检查status == task_id 的附加任务，有执行他的script
+
+        doTriggerScript(job.getId());
 
     }
 
@@ -150,8 +168,58 @@ public class WorkerThread implements Runnable {
             logger.error(e.getMessage() + ",cause:" + e.getCause() + " params:" + new Gson().toJson(params));
             return 0L;
         }
-
     }
+
+    private void doTriggerScript(int taskId) {
+        List<HsScheduleJob> jobs = getScriptJobs(taskId);
+        if(jobs==null) return;
+        if(jobs.isEmpty()) return;
+        app.getLocalCacheHandler().addAll(jobs);
+    }
+
+    private List<HsScheduleJob> getScriptJobs(int status) {
+        if (this.looper.getFluentJdbc() == null) {
+            return null;
+        }
+        Query query = this.looper.getFluentJdbc().query();
+        if(query == null) {
+            return null;
+        }
+
+        String querySql = "SELECT * FROM sp_hs_schedule_jobs WHERE status = " + status ;
+        List<HsScheduleJob> result = null;
+        try {
+
+            result = query.select(querySql)
+                    .listResult(new Mapper<HsScheduleJob>() {
+                        public HsScheduleJob map(ResultSet rs) throws SQLException {
+                            HsScheduleJob hsScheduleJob = new HsScheduleJob();
+                            hsScheduleJob.setId(rs.getInt("id"));
+                            hsScheduleJob.setType(rs.getInt("type"));
+                            hsScheduleJob.setAttachment_script(rs.getString("attachment_script"));
+                            hsScheduleJob.setBe_updated_field_name(rs.getString("be_updated_field_name"));
+                            hsScheduleJob.setBiz_table_name(rs.getString("biz_table_name"));
+                            hsScheduleJob.setCondition_field_name(rs.getString("condition_field_name"));
+                            hsScheduleJob.setCondition_field_type(rs.getInt("condition_field_type"));
+                            hsScheduleJob.setCondition_field_value(rs.getString("condition_field_value"));
+                            hsScheduleJob.setCreate_time(rs.getString("create_time"));
+                            hsScheduleJob.setStatus(rs.getInt("status"));
+                            hsScheduleJob.setTiming_cycle(rs.getInt("timing_cycle"));
+                            hsScheduleJob.setTiming_unit(rs.getInt("timing_unit"));
+                            hsScheduleJob.setField_final_value(rs.getInt("field_final_value"));
+                            hsScheduleJob.setField_original_value(rs.getInt("field_original_value"));
+                            hsScheduleJob.setUpdate_time(rs.getString("update_time"));
+                            return hsScheduleJob;
+                        }
+                    });
+        } catch (FluentJdbcException e) {
+            logger.error(e.getMessage() + ",cause:" + e.getCause());
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+        }
+        return  result;
+    }
+
     private boolean refundOperateLog(HsScheduleJob job,int evidenceId) {
         if (!job.getBiz_table_name().equals("sp_hs_new_refund")) {
             return false;
@@ -227,7 +295,26 @@ public class WorkerThread implements Runnable {
         return false;
     }
     private boolean doScriptJob(HsScheduleJob job) {
-        logger.info("Do script job(ID:" + job.getId() + ")");
+
+        if(StringUtils.isNullOrEmpty(job.getAttachment_script())) {
+            logger.error("Script job. script is empty.");
+            return false;
+        }
+        if(StringUtils.isNullOrEmpty(app.getRedisMessageQueueKey())) {
+            logger.error("Redis queue key not found.");
+            return false;
+        }
+        Jedis jedis = app.getJedisPoolHandler().getResource();
+        if(jedis == null) {
+            return false;
+        }
+        try {
+            long result = jedis.rpush(app.getRedisMessageQueueKey(),job.getAttachment_script());
+            jedis.close();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return false;
+        }
         return true;
     }
 

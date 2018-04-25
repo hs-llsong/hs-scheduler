@@ -9,4 +9,10 @@ public class AppPropertiesKey {
     public final static String DB_USER_KEY = "DbUser";
     public final static String DB_PASSWORD_KEY = "DbPassword";
     public final static String THREAD_POOL_SIZE_KEY = "ThreadPoolSize";
+
+    public final static String REDIS_HOST_KEY = "RedisHost";
+    public final static String REDIS_PORT_KEY = "RedisPort";
+    public final static String REDIS_AUTH_KEY = "RedisAuth";
+
+    public final static String REDIS_MESSAGE_PUSH_CACHE_KEY = "MessagePushCacheKey";
 }

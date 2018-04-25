@@ -14,6 +14,7 @@ public class AppConstent {
     public static final int JOB_TYPE_EXECUTE_SQL = 2;
     public static final int JOB_TYPE_EXECUTE_SCRIPT = 1;
     public static final int JOB_TYPE_NORMAL = 0;
+    public static final int JOB_TYPE_PUSH_MESSAGE = 4;
 
     public static final int ATTACH_JOB_TYPE_NEWTASK = 1;
     public static final int ATTACH_JOB_TYPE_PUSH_MESSAGE = 2;

@@ -1,18 +1,14 @@
 package com.ontheroadstore.hs;
 
-import com.ontheroadstore.hs.Handler.DbLooper;
-import com.ontheroadstore.hs.Handler.LocalCacheHandler;
-import com.ontheroadstore.hs.Handler.TaskConsumeLooper;
-import com.ontheroadstore.hs.Handler.TaskProductLooper;
+import com.ontheroadstore.hs.Handler.*;
 import com.ontheroadstore.hs.bean.HsScheduleJob;
 import org.apache.commons.dbcp.BasicDataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
-import org.omg.SendingContext.RunTime;
 
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -25,8 +21,9 @@ public class App {
     private Properties prop;
     private DataSource ds;
     private LocalCacheHandler<HsScheduleJob> localCacheHandler;
+    private JedisPoolHandler jedisPoolHandler;
     private Map<String,DbLooper> looperMap = new HashMap<>();
-
+    private String redisMessageQueueKey;
     public static void main( String[] args ){
         App app = new App();
         Properties prop = app.loadProperties();
@@ -35,6 +32,23 @@ public class App {
             System.exit(-1);
         }
         app.setProp(prop);
+
+        String redis_host,redis_auth,redis_sport,redis_queue_key;
+        int redis_port = 6379;
+        redis_host = prop.getProperty(AppPropertiesKey.REDIS_HOST_KEY);
+        redis_auth = prop.getProperty(AppPropertiesKey.REDIS_AUTH_KEY);
+        redis_sport = prop.getProperty(AppPropertiesKey.REDIS_PORT_KEY);
+        redis_queue_key = prop.getProperty(AppPropertiesKey.REDIS_MESSAGE_PUSH_CACHE_KEY);
+        app.setRedisMessageQueueKey(redis_queue_key);
+        if (StringUtils.isEmpty(redis_host)) {
+            System.out.println("Redis host must be set.");
+            System.exit(0);
+        }
+        if (!StringUtils.isEmpty(redis_sport)) {
+            redis_port = Integer.valueOf(redis_sport);
+        }
+        app.setJedisPoolHandler(new JedisPoolHandler(redis_host,redis_port,redis_auth,3000));
+
         app.setUpDataSource();
         app.setLocalCacheHandler(new LocalCacheHandler<>());
         TaskProductLooper productLooper = new TaskProductLooper(app);
@@ -137,5 +151,21 @@ public class App {
                 looper.stop();
             }
         }
+    }
+
+    public JedisPoolHandler getJedisPoolHandler() {
+        return jedisPoolHandler;
+    }
+
+    public void setJedisPoolHandler(JedisPoolHandler jedisPoolHandler) {
+        this.jedisPoolHandler = jedisPoolHandler;
+    }
+
+    public String getRedisMessageQueueKey() {
+        return redisMessageQueueKey;
+    }
+
+    public void setRedisMessageQueueKey(String redisMessageQueueKey) {
+        this.redisMessageQueueKey = redisMessageQueueKey;
     }
 }
