@@ -171,18 +171,27 @@ public class WorkerThread implements Runnable {
     }
 
     private void doTriggerScript(int taskId) {
+        logger.debug("Do trigger script for task id: " + taskId);
         List<HsScheduleJob> jobs = getScriptJobs(taskId);
-        if(jobs==null) return;
-        if(jobs.isEmpty()) return;
+        if(jobs==null) {
+            logger.debug("Not found attachment script return null.");
+            return;
+        }
+        if(jobs.isEmpty()) {
+            logger.debug("Not found attachment script.");
+            return;
+        }
         app.getLocalCacheHandler().addAll(jobs);
     }
 
     private List<HsScheduleJob> getScriptJobs(int status) {
         if (this.looper.getFluentJdbc() == null) {
+            logger.error("Can not load jdbc handler.");
             return null;
         }
         Query query = this.looper.getFluentJdbc().query();
         if(query == null) {
+            logger.error("query object is null.");
             return null;
         }
 
@@ -192,28 +201,33 @@ public class WorkerThread implements Runnable {
 
             result = query.select(querySql)
                     .listResult(new Mapper<HsScheduleJob>() {
+
                         public HsScheduleJob map(ResultSet rs) throws SQLException {
-                            HsScheduleJob hsScheduleJob = new HsScheduleJob();
-                            hsScheduleJob.setId(rs.getInt("id"));
-                            hsScheduleJob.setType(rs.getInt("type"));
-                            hsScheduleJob.setAttachment_script(rs.getString("attachment_script"));
-                            hsScheduleJob.setBe_updated_field_name(rs.getString("be_updated_field_name"));
-                            hsScheduleJob.setBiz_table_name(rs.getString("biz_table_name"));
-                            hsScheduleJob.setCondition_field_name(rs.getString("condition_field_name"));
-                            hsScheduleJob.setCondition_field_type(rs.getInt("condition_field_type"));
-                            hsScheduleJob.setCondition_field_value(rs.getString("condition_field_value"));
-                            hsScheduleJob.setCreate_time(rs.getString("create_time"));
-                            hsScheduleJob.setStatus(rs.getInt("status"));
-                            hsScheduleJob.setTiming_cycle(rs.getInt("timing_cycle"));
-                            hsScheduleJob.setTiming_unit(rs.getInt("timing_unit"));
-                            hsScheduleJob.setField_final_value(rs.getInt("field_final_value"));
-                            hsScheduleJob.setField_original_value(rs.getInt("field_original_value"));
-                            hsScheduleJob.setUpdate_time(rs.getString("update_time"));
-                            return hsScheduleJob;
+
+                            HsScheduleJob job = new HsScheduleJob();
+                            job.setId(rs.getInt("id"));
+                            job.setType(rs.getInt("type"));
+                            job.setAttachment_script(rs.getString("attachment_script"));
+                            job.setBe_updated_field_name(rs.getString("be_updated_field_name"));
+                            job.setBiz_table_name(rs.getString("biz_table_name"));
+                            job.setCondition_field_name(rs.getString("condition_field_name"));
+                            job.setCondition_field_type(rs.getInt("condition_field_type"));
+                            job.setCondition_field_value(rs.getString("condition_field_value"));
+                            job.setCreate_time(rs.getString("create_time"));
+                            job.setStatus(rs.getInt("status"));
+                            job.setTiming_cycle(rs.getInt("timing_cycle"));
+                            job.setTiming_unit(rs.getInt("timing_unit"));
+                            job.setField_final_value(rs.getInt("field_final_value"));
+                            job.setField_original_value(rs.getInt("field_original_value"));
+                            job.setOriginal_sql("");
+                            job.setUpdate_time(rs.getString("update_time"));
+                            return job;
                         }
                     });
         } catch (FluentJdbcException e) {
+
             logger.error(e.getMessage() + ",cause:" + e.getCause());
+
         } catch (Exception e) {
             logger.error(e.getMessage());
         }
