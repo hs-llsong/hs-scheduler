@@ -82,10 +82,12 @@ public class WorkerThread implements Runnable {
             if(job.getType() == AppConstent.JOB_TYPE_NORMAL) {
                 evidenceId = (int)insertRefundEvidence(job);
             }
+            logger.debug("---------insert evidence return :" + evidenceId);
             result = refundOperateLog(job,evidenceId);
             if (!result) {
                 logger.error("Record refund log error!");
             }
+            logger.debug("------insert refund operate log done.");
         }
 
         //检查status == task_id 的附加任务，有执行他的script
