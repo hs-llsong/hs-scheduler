@@ -69,9 +69,12 @@ public class WorkerThread implements Runnable {
             updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE_RESULT_FAILED);
             return;
         }
-        logger.info("Job(ID:" + job.getId() + ") done.");
+
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
+        logger.info("Job done:" + job.getId());
+
         if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SCRIPT) {
+            logger.debug("Script job done: " + job.getId());
             return;
         }
         if (job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)){
