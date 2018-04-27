@@ -74,20 +74,21 @@ public class WorkerThread implements Runnable {
         logger.info("Job done:" + job.getId());
 
         if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SCRIPT) {
-            logger.debug("Script job done: " + job.getId());
+            logger.info("Script job done: " + job.getId());
             return;
         }
+
         if (job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)){
             int evidenceId = 0;
             if(job.getType() == AppConstent.JOB_TYPE_NORMAL) {
                 evidenceId = (int)insertRefundEvidence(job);
             }
-            logger.debug("---------insert evidence return :" + evidenceId);
+
             result = refundOperateLog(job,evidenceId);
             if (!result) {
                 logger.error("Record refund log error!");
             }
-            logger.debug("------insert refund operate log done.");
+
         }
 
         //检查status == task_id 的附加任务，有执行他的script
@@ -98,7 +99,7 @@ public class WorkerThread implements Runnable {
 
     private boolean doAttachmentJob(HsScheduleJob job) {
         if (StringUtils.isNullOrEmpty(job.getAttachment_script())) return false;
-        logger.debug("New job start:" + job.getAttachment_script());
+        logger.info("New job start:" + job.getAttachment_script());
         AttachJob attachJob = null;
         try {
             attachJob = new Gson().fromJson(job.getAttachment_script(), AttachJob.class);
@@ -176,14 +177,14 @@ public class WorkerThread implements Runnable {
     }
 
     private void doTriggerScript(int taskId) {
-        logger.debug("Do trigger script for task id: " + taskId);
+        logger.info("Do trigger script for task id: " + taskId);
         List<HsScheduleJob> jobs = getScriptJobs(taskId);
         if(jobs==null) {
-            logger.debug("Not found attachment script return null.");
+            logger.info("Not found attachment script return null.");
             return;
         }
         if(jobs.isEmpty()) {
-            logger.debug("Not found attachment script.");
+            logger.info("Not found attachment script.");
             return;
         }
         app.getLocalCacheHandler().addAll(jobs);

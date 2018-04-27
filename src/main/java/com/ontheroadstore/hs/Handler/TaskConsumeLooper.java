@@ -52,6 +52,8 @@ public class TaskConsumeLooper extends DbLooper {
             } else {
                 return doAdjustExecuteTime(job.getCreate_time(), job);
             }
+        } else if(job.getStatus()>40) {
+            return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
         } else {
 
             if (StringUtils.isNullOrEmpty(job.getUpdate_time())) {
