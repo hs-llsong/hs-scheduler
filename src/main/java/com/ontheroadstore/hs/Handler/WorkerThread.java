@@ -177,7 +177,7 @@ public class WorkerThread implements Runnable {
     }
 
     private void doTriggerScript(int taskId) {
-        logger.info("Do trigger script for task id: " + taskId);
+
         List<HsScheduleJob> jobs = getScriptJobs(taskId);
         if(jobs==null) {
             logger.info("Not found attachment script return null.");
@@ -187,9 +187,11 @@ public class WorkerThread implements Runnable {
             logger.info("Not found attachment script.");
             return;
         }
-        Gson gson = new Gson();
-        logger.info("trigger jobs: " + gson.toJson(jobs));
-        app.getLocalCacheHandler().addAll(jobs);
+        if(!app.getLocalCacheHandler().addAll(jobs)) {
+            logger.error("Add trigger task in queue failed. trigger job: " + taskId);
+        } else {
+            logger.info("Add trigger task success.trigger job: " + taskId);
+        }
     }
 
     private List<HsScheduleJob> getScriptJobs(int status) {
