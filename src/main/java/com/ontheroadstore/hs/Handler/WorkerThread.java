@@ -187,6 +187,8 @@ public class WorkerThread implements Runnable {
             logger.info("Not found attachment script.");
             return;
         }
+        Gson gson = new Gson();
+        logger.info("trigger jobs: " + gson.toJson(jobs));
         app.getLocalCacheHandler().addAll(jobs);
     }
 

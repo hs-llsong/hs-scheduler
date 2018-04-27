@@ -38,10 +38,9 @@ public class TaskConsumeLooper extends DbLooper {
         if (getFluentJdbc() == null) {
             buildFluentJdbc();
         }
-        HsScheduleJob job = null;
-        job = getApp().getLocalCacheHandler().poll();
+        HsScheduleJob job = getApp().getLocalCacheHandler().poll();
         if (job == null) return sleepTime;
-
+        logger.info("Job in business: " + job.getId() + ",status=" + job.getStatus());
         if (job.getStatus() == AppConstent.JOB_STATUS_TODO) {
             return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
         } else if(job.getStatus() == AppConstent.JOB_STATUS_REJECTED) {
