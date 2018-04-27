@@ -40,7 +40,7 @@ public class TaskConsumeLooper extends DbLooper {
         }
         HsScheduleJob job = getApp().getLocalCacheHandler().poll();
         if (job == null) return sleepTime;
-        logger.info("Job in business: " + job.getId() + ",status=" + job.getStatus());
+
         if (job.getStatus() == AppConstent.JOB_STATUS_TODO) {
             return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
         } else if(job.getStatus() == AppConstent.JOB_STATUS_REJECTED) {
@@ -52,6 +52,7 @@ public class TaskConsumeLooper extends DbLooper {
                 return doAdjustExecuteTime(job.getCreate_time(), job);
             }
         } else if(job.getStatus()>40) {
+            logger.info("To do trigger job: " + job.getId());
             return doExecutorServiceSchedule(job, job.getTiming_cycle(), getTimeUint(job.getTiming_unit()));
         } else {
 
@@ -79,13 +80,13 @@ public class TaskConsumeLooper extends DbLooper {
         int totalMinutes = getTotalMinutes(job);
         int remain = totalMinutes - escapedMinutes;
         if (remain < 0) remain = 0;
-        logger.info("Continue to do job(ID:" + job.getId() + ") with remain minutes:" + remain);
+
         return doExecutorServiceSchedule(job, remain, TimeUnit.MINUTES);
     }
 
     private int doExecutorServiceSchedule(HsScheduleJob job, int timing, TimeUnit timeUnit) {
         try {
-            executorService.schedule(new WorkerThread(job, this), timing, timeUnit);
+            executorService.schedule(new WorkerThread(job, this,getApp()), timing, timeUnit);
             logger.info("Job(ID:" + job.getId() + ") in working schedule.");
             return 0;
         } catch (RejectedExecutionException e) {

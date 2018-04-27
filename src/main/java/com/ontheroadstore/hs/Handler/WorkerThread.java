@@ -45,7 +45,7 @@ public class WorkerThread implements Runnable {
 
     @Override
     public void run() {
-        logger.info("To do job(ID:" + job.getId() + ").");
+
         if (looper.getFluentJdbc()==null) {
             logger.error("Jdbc connection is null.can't finish job(ID:" + job.getId()+ ")");
             try {
@@ -71,7 +71,8 @@ public class WorkerThread implements Runnable {
         }
 
         updateJobStatus(job.getId(),AppConstent.JOB_STATUS_DONE);
-        logger.info("Job done:" + job.getId());
+
+        logger.info("Job done: " + job.getId());
 
         if(job.getType()==AppConstent.JOB_TYPE_EXECUTE_SCRIPT) {
             logger.info("Script job done: " + job.getId());
@@ -99,7 +100,7 @@ public class WorkerThread implements Runnable {
 
     private boolean doAttachmentJob(HsScheduleJob job) {
         if (StringUtils.isNullOrEmpty(job.getAttachment_script())) return false;
-        logger.info("New job start:" + job.getAttachment_script());
+        
         AttachJob attachJob = null;
         try {
             attachJob = new Gson().fromJson(job.getAttachment_script(), AttachJob.class);
@@ -187,6 +188,7 @@ public class WorkerThread implements Runnable {
             logger.info("Not found attachment script.");
             return;
         }
+
         if(!app.getLocalCacheHandler().addAll(jobs)) {
             logger.error("Add trigger task in queue failed. trigger job: " + taskId);
         } else {
