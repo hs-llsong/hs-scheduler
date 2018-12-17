@@ -45,7 +45,7 @@ public class WorkerThread implements Runnable {
 
     @Override
     public void run() {
-
+        logger.info("workerThread run job(ID:" + job.getId()+ ")");
         if (looper.getFluentJdbc()==null) {
             logger.error("Jdbc connection is null.can't finish job(ID:" + job.getId()+ ")");
             try {
@@ -335,7 +335,7 @@ public class WorkerThread implements Runnable {
             return false;
         }
         try {
-            long result = jedis.rpush(app.getRedisMessageQueueKey(),job.getAttachment_script());
+            jedis.rpush(app.getRedisMessageQueueKey(),job.getAttachment_script());
             jedis.close();
         } catch (Exception e) {
             logger.error(e.getMessage());
@@ -360,32 +360,77 @@ public class WorkerThread implements Runnable {
     }
 
     private boolean doNormallyJob(HsScheduleJob job) {
-
         if (job.getBiz_table_name().equals(AppConstent.ORDER_TABLE_NAME) ) {
             return doOrderJob(job);
         } else if(job.getBiz_table_name().equals(AppConstent.REFUND_TABLE_NAME)) {
             return doRefundJob(job);
+        } else if (job.getBiz_table_name().equals(AppConstent.GUISHI_ORDER_TABLE_NAME)) {
+            return doRefundJob(job);
         }
         return true;
     }
+
     private boolean doRefundJob(HsScheduleJob job) {
+
         String updateSql = "UPDATE " + job.getBiz_table_name()
                 + " SET "
                 + job.getBe_updated_field_name()
                 + " = :update_value"
-                + ",updated_at = :update_at"
+                + ",updated_at = :updated_at"
                 + " WHERE "
                 + job.getCondition_field_name()
                 + " = :condition_value "
                 + "AND "
                 + job.getBe_updated_field_name()
                 + " = :old_value";
+
         Map<String,Object> namedParams = new HashMap<>();
         namedParams.put("condition_value",job.getCondition_field_value());
         namedParams.put("old_value",job.getField_original_value());
         namedParams.put("update_value",job.getField_final_value());
-        namedParams.put("updated_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
-        if(!doUpdateSql(updateSql,namedParams)) return false;
+
+        if (job.getBiz_table_name().equals(AppConstent.GUISHI_ORDER_TABLE_NAME)) {
+            namedParams.put("updated_at", System.currentTimeMillis() / 1000L);
+        } else {
+            namedParams.put("updated_at", DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
+        }
+
+        logger.debug("SQL:" + updateSql);
+        logger.debug("SQL params:" + new Gson().toJson(namedParams));
+        if (!doUpdateSql(updateSql,namedParams)) {
+            return false;
+        }
+
+        // sp_hs_ghost_orders
+        if (job.getBiz_table_name().equals(AppConstent.GUISHI_ORDER_TABLE_NAME)) {
+            if (job.getBe_updated_field_name().equals("order_status")) {
+
+                String guishiOrderQueueName = null;
+                if (job.getField_original_value() == 1 && job.getField_final_value() == 5) {
+                    // order_status: 1->5=交易关闭，需要处理商品数量加回库存动作
+                    guishiOrderQueueName = "queue_guishi_order_goods";
+                } else if (job.getField_original_value() == 3 && job.getField_final_value() == 4) {
+                    // order_status: 3->4=已签收-交易完成，需要处理卖家可提现金额
+                    guishiOrderQueueName = "queue_guishi_amount_drawing";
+                }
+
+                if (guishiOrderQueueName != null) {
+                    Jedis jedis = app.getJedisPoolHandler().getResource();
+                    if (jedis == null) {
+                        logger.error("app.getJedisPoolHandler().getResource() failed");
+                        return false;
+                    }
+                    try {
+                        jedis.rpush(guishiOrderQueueName, job.getCondition_field_value());
+                        jedis.close();
+                    } catch (Exception e) {
+                        logger.error(e.getMessage());
+                        return false;
+                    }
+                }
+            }
+        }
+
         doAttachmentJob(job);
         return true;
     }
@@ -425,6 +470,7 @@ public class WorkerThread implements Runnable {
         namedParams.put("time_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
         logger.debug("SQL params:" + new Gson().toJson(namedParams));
         if(!doUpdateSql(updateSql,namedParams)) return false;
+        // set hs_user_coupon status = 1
         doAttachmentJob(job);
         return true;
     }

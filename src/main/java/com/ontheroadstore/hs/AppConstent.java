@@ -21,5 +21,6 @@ public class AppConstent {
 
     public static final String ORDER_TABLE_NAME = "sp_hs_orders";
     public static final String REFUND_TABLE_NAME = "sp_hs_new_refund";
+    public static final String GUISHI_ORDER_TABLE_NAME = "sp_hs_ghost_orders";
     public static final int ORDER_PROCESS_STATUS_CLOSED = 33;
 }

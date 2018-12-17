@@ -108,7 +108,8 @@ public class App {
             try {
                 this.ds.getConnection().close();
             } catch (SQLException e) {
-
+                logger.error(e.getMessage());
+                return null;
             }
         }
         String host = prop.getProperty(AppPropertiesKey.DB_HOST_KEY);
@@ -123,7 +124,7 @@ public class App {
         ds.setDriverClassName("com.mysql.jdbc.Driver");
         String url = "jdbc:mysql://" +
                 prop.getProperty(AppPropertiesKey.DB_HOST_KEY) + ":3306/" +
-                prop.getProperty(AppPropertiesKey.DB_NAME_KEY);
+                prop.getProperty(AppPropertiesKey.DB_NAME_KEY) + "?autoReconnect=true";
         ds.setUrl(url);
         ds.setUsername(prop.getProperty(AppPropertiesKey.DB_USER_KEY));
         ds.setPassword(prop.getProperty(AppPropertiesKey.DB_PASSWORD_KEY));
