@@ -82,8 +82,10 @@ public class TaskConsumeLooper extends DbLooper {
         int escapedMinutes = Minutes.minutesBetween(updateDateTime, nowDateTime).getMinutes();
         int totalMinutes = getTotalMinutes(job);
         int remain = totalMinutes - escapedMinutes;
-        if (remain < 0) remain = 0;
-
+        logger.info("Job(ID:" + job.getId() + ") remains: " + remain);
+        if (remain < 0) {
+            remain = 0;
+        }
         return doExecutorServiceSchedule(job, remain, TimeUnit.MINUTES);
     }
 
