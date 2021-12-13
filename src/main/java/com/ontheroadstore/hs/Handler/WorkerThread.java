@@ -395,9 +395,9 @@ public class WorkerThread implements Runnable {
             namedParams.put("updated_at", DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
         }
 
-        logger.debug("SQL:" + updateSql);
         logger.debug("SQL params:" + new Gson().toJson(namedParams));
         if (!doUpdateSql(updateSql,namedParams)) {
+            logger.debug("doRefundJob doUpdateSql failed: " + updateSql);
             return false;
         }
 
@@ -469,7 +469,10 @@ public class WorkerThread implements Runnable {
         namedParams.put("update_value",isUnpaid?AppConstent.ORDER_PROCESS_STATUS_CLOSED:job.getField_final_value());
         namedParams.put("time_at",DateTime.now().toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")));
         logger.debug("SQL params:" + new Gson().toJson(namedParams));
-        if(!doUpdateSql(updateSql,namedParams)) return false;
+        if(!doUpdateSql(updateSql,namedParams)) {
+            logger.debug("doOrderJob doUpdateSql failed: " + updateSql);
+            return false;
+        }
         // set hs_user_coupon status = 1
         doAttachmentJob(job);
         return true;

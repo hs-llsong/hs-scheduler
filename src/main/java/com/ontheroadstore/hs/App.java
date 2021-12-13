@@ -128,6 +128,9 @@ public class App {
         ds.setUrl(url);
         ds.setUsername(prop.getProperty(AppPropertiesKey.DB_USER_KEY));
         ds.setPassword(prop.getProperty(AppPropertiesKey.DB_PASSWORD_KEY));
+        ds.setTestWhileIdle(true);
+        ds.setTimeBetweenEvictionRunsMillis(3600);
+        ds.setValidationQuery("select 1");
         this.ds = ds;
         return ds;
     }
